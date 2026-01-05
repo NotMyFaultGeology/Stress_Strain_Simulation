@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stress–Strain Simulator (Tension)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;font-family:system-ui;background:#f6f7fb}
+canvas{width:100%;height:520px;border:1px solid #ccc;border-radius:12px;background:#fff}
+.wrap{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px}
+.panel{background:#fff;padding:14px;border-radius:12px;border:1px solid #ddd}
+button,select{width:100%;padding:10px;border-radius:8px;margin-top:6px}
+button{background:#1f6feb;color:#fff;border:none;font-weight:600}
+.legend{font-size:12px;margin-top:8px}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h3>Stress–Strain Simulator</h3>
+
+    <label>Material</label>
+    <select id="material">
+      <option value="silly">Silly Putty</option>
+      <option value="ice">Ice</option>
+    </select>
+
+    <label>Rate</label>
+    <select id="rate">
+      <option value="slow">Slow</option>
+      <option value="fast">Fast</option>
+    </select>
+
+    <label>Stress</label>
+    <select id="stress">
+      <option value="low">Low</option>
+      <option value="high">High</option>
+    </select>
+
+    <button onclick="run()">Run</button>
+    <button onclick="step()">Step</button>
+    <button onclick="reset()">Reset</button>
+
+    <div class="legend">
+      <b>Note:</b> Object is under <b>tension</b> (pulled apart vertically).
+    </div>
+  </div>
+
+  <canvas id="c"></canvas>
+</div>
+
+<script>
+/* ===============================
+   EMBEDDED IMAGES (BASE64)
+   =============================== */
+
+const ICE_DATA_URI =
+"data:image/png;base64,PASTE THE FULL ICE BASE64 STRING HERE
+";
+
+const SILLY_DATA_URI =
+"data:image/png;base64,PASTE THE FULL SILLY PUTTY BASE64 STRING HERE
+";
+
+/* ===============================
+   SIMULATION DATA
+   =============================== */
+
+const SHAPES = [
+  [{x:0,y:5},{x:5,y:0},{x:0,y:-5},{x:-5,y:0}],
+  [{x:0,y:4},{x:6,y:0},{x:0,y:-4},{x:-6,y:0}],
+  [{x:0,y:3},{x:7,y:0},{x:0,y:-3},{x:-7,y:0}],
+  [{x:0,y:2},{x:8,y:0},{x:0,y:-2},{x:-8,y:0}]
+];
+
+const BREAK_RULES = {
+  silly:{slow:{low:3,high:3},fast:{low:3,high:1}},
+  ice:{slow:{low:3,high:1},fast:{low:1,high:1}}
+};
+
+let frame = 0, timer = null;
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+const IMG = {ice:null,silly:null};
+
+function loadImages(){
+  IMG.ice = new Image();
+  IMG.silly = new Image();
+  IMG.ice.src = ICE_DATA_URI;
+  IMG.silly.src = SILLY_DATA_URI;
+}
+
+loadImages();
+
+/* ===============================
+   DRAWING
+   =============================== */
+
+function resize(){
+  const d=window.devicePixelRatio||1;
+  canvas.width=canvas.clientWidth*d;
+  canvas.height=canvas.clientHeight*d;
+  ctx.setTransform(d,0,0,d,0,0);
+  draw();
+}
+window.onresize=resize;
+
+function world(x,y){
+  const s=Math.min(canvas.width,canvas.height)/30;
+  return {x:canvas.width/2+x*s,y:canvas.height/2-y*s};
+}
+
+function drawEllipse(material,i){
+  const pts=SHAPES[i];
+  const rx=Math.abs(pts[1].x), ry=Math.abs(pts[0].y);
+  const c=world(0,0), rX=world(rx,0), rY=world(0,ry);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(c.x,c.y,Math.abs(rX.x-c.x),Math.abs(rY.y-c.y),0,0,Math.PI*2);
+  ctx.clip();
+
+  const img=material==="ice"?IMG.ice:IMG.silly;
+  ctx.drawImage(img,c.x-200,c.y-200,400,400);
+  ctx.restore();
+
+  ctx.lineWidth=4;
+  ctx.strokeStyle="#1f6feb";
+  ctx.beginPath();
+  ctx.ellipse(c.x,c.y,Math.abs(rX.x-c.x),Math.abs(rY.y-c.y),0,0,Math.PI*2);
+  ctx.stroke();
+}
+
+function drawBroken(){
+  ctx.strokeStyle="red";
+  ctx.lineWidth=6;
+  ctx.beginPath();ctx.moveTo(80,80);ctx.lineTo(300,300);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(300,80);ctx.lineTo(80,300);ctx.stroke();
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const m=document.getElementById("material").value;
+  const r=document.getElementById("rate").value;
+  const s=document.getElementById("stress").value;
+  const stop=BREAK_RULES[m][r][s]+1;
+
+  if(frame<stop) drawEllipse(m,Math.min(frame,3));
+  else drawBroken();
+}
+
+/* ===============================
+   CONTROLS
+   =============================== */
+
+function step(){frame++;draw();}
+function reset(){frame=0;draw();}
+function run(){
+  reset();
+  clearInterval(timer);
+  timer=setInterval(()=>{step();},document.getElementById("rate").value==="fast"?400:1000);
+}
+
+resize();
+</script>
+</body>
+</html>
